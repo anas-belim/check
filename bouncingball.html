@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bouncing Ball</title>
+<style>
+  :root {
+    --bg: #0fa15d; /* deeper green */
+    --panel: #4fd1e5; /* brighter light blue */
+    --accent-green: #2ecc71;
+    --accent-blue: #3498db;
+    --shadow-green: rgba(46, 204, 113, 0.5);
+    --shadow-blue: rgba(52, 152, 219, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(1200px 500px at 50% -200px, var(--panel), var(--bg));
+    display: grid;
+    place-items: center;
+    font-family: system-ui, Arial, sans-serif;
+    color: #f8f9fa;
+  }
+
+  .stage {
+    width: min(92vw, 560px);
+    height: min(70vh, 520px);
+    border-radius: 24px;
+    background: linear-gradient(to bottom, var(--accent-green), var(--accent-blue));
+    box-shadow: 0 20px 60px var(--shadow-blue), 
+                inset 0 4px 12px rgba(255, 255, 255, 0.3),
+                inset 0 -4px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ball {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 35%, #ffffffcc, transparent 40%),
+      radial-gradient(circle at 60% 55%, var(--accent-green), var(--panel));
+    filter: drop-shadow(0 6px 12px var(--shadow-green));
+    will-change: transform;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  /* Subtle pattern overlay for the stage */
+  .stage::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 25px, transparent 26px),
+      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 25px, transparent 26px);
+    background-size: 100px 100px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <!-- Balls created by JS -->
+  </div>
+
+<script>
+(function() {
+  const stage = document.getElementById('stage');
+
+  // Tunable parameters
+  const PARAMS = {
+    gravity: 1800,     // px/s^2
+    bounce: 0.78,      // 0..1 (energy retained on bounce)
+    airDrag: 0.0008,   // linear drag per ms for horizontal motion
+    spawnCount: 1,     // set to >1 for multiple balls
+    radius: 24
+  };
+
+  function createBall(x, y, vx = 0, vy = 0) {
+    const el = document.createElement('div');
+    el.className = 'ball';
+    el.style.width = el.style.height = PARAMS.radius * 2 + 'px';
+    stage.appendChild(el);
+    return { el, x, y, vx, vy, r: PARAMS.radius };
+  }
+
+  // Initial positions
+  const W = () => stage.clientWidth;
+  const H = () => stage.clientHeight;
+
+  const balls = [];
+  const centerX = () => W() / 2 - PARAMS.radius;
+  for (let i = 0; i < PARAMS.spawnCount; i++) {
+    const spread = (i - (PARAMS.spawnCount - 1) / 2) * 16;
+    balls.push(createBall(centerX() + spread, 10 + i * 2, (Math.random() - 0.5) * 200, 0));
+  }
+
+  // Resize safety so floor stays correct
+  let bounds = { w: W(), h: H() };
+  const ro = new ResizeObserver(() => { bounds = { w: W(), h: H() }; });
+  ro.observe(stage);
+
+  let last = performance.now();
+  function tick(now) {
+    const dt = (now - last) / 1000; // seconds
+    last = now;
+
+    for (const b of balls) {
+      // Integrate velocity and position
+      b.vy += PARAMS.gravity * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // Floor collision
+      const floor = bounds.h - b.r * 2;
+      if (b.y > floor) {
+        b.y = floor;
+        b.vy = -b.vy * PARAMS.bounce;
+        if (Math.abs(b.vy) < 20) b.vy = 0;
+      }
+
+      // Walls (left/right)
+      if (b.x < 0) { b.x = 0; b.vx = -b.vx * PARAMS.bounce; }
+      const right = bounds.w - b.r * 2;
+      if (b.x > right) { b.x = right; b.vx = -b.vx * PARAMS.bounce; }
+
+      // Air drag for horizontal motion
+      b.vx *= Math.max(0, 1 - PARAMS.airDrag * (dt * 1000));
+
+      // Render
+      b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
+    }
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Click to add a ball with a little upward kick
+  stage.addEventListener('click', e => {
+    const rect = stage.getBoundingClientRect();
+    const x = e.clientX - rect.left - PARAMS.radius;
+    const y = e.clientY - rect.top - PARAMS.radius;
+    balls.push(createBall(x, y, (Math.random() - 0.5) * 250, -600 - Math.random() * 200));
+  });
+})();
+</script>
+</body>
+</html>
